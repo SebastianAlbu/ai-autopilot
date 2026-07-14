@@ -33,3 +33,9 @@ Return:
 Verification: <static | built ok | tests run: pass/fail>
 ```
 If you find nothing substantive, say so explicitly and return PASS.
+
+## Output Style (minimal tokens)
+Follow the `token-saver` skill. Emit findings only — one line each:
+`[Blocker|Major|Minor|Nit] path:line — problem → fix`. No preamble, no diff restatement, no full-file quotes;
+quote at most the one offending line. End with a single-line section verdict (`PASS | COMMENTS | CHANGES`).
+If nothing to report: `PASS — no findings.`

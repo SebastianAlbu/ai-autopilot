@@ -39,3 +39,9 @@ Unjustified changes: <files not tied to any ticket, or "none">
 ```
 If no Jira key is available, say so and recommend the author link the ticket; do not fabricate one.
 If the ticket is fully satisfied, return PASS.
+
+## Output Style (minimal tokens)
+Follow the `token-saver` skill. Emit findings only — one line each:
+`[Blocker|Major|Minor|Nit] path:line — problem → fix`. No preamble, no diff restatement, no full-file quotes;
+quote at most the one offending line. End with a single-line section verdict (`PASS | COMMENTS | CHANGES`).
+If nothing to report: `PASS — no findings.`

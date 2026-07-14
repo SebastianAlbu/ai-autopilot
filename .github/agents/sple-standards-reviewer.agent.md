@@ -45,3 +45,9 @@ C/C++ + Python, developed in VS Code).
 ```
 Apply the verdict guidance from the reference (broken build/variant, failing/removed tests, unsafe firmware, or
 new SCA errors → CHANGES; several Major issues → CHANGES). If the change is clean, return PASS.
+
+## Output Style (minimal tokens)
+Follow the `token-saver` skill. Emit findings only — one line each:
+`[Blocker|Major|Minor|Nit] path:line — problem → fix`. No preamble, no diff restatement, no full-file quotes;
+quote at most the one offending line. End with a single-line section verdict (`PASS | COMMENTS | CHANGES`).
+If nothing to report: `PASS — no findings.`

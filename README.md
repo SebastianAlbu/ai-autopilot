@@ -59,7 +59,8 @@ flowchart TD
 
 #### General-purpose skills (available while programming)
 These are not part of the PR-review flow — they are general Copilot skills bundled in the package and
-installed alongside the review skills, so they're available in every workspace after `install-to-vscode.bat`.
+installed alongside the review skills, so they're available in every workspace after running the installer
+(`install.bat` on Windows, `./install.sh` on macOS/Linux).
 | Skill | What it does |
 |-------|--------------|
 | `pptx` | Create, read, edit and combine PowerPoint (`.pptx`) presentations. |
@@ -116,29 +117,36 @@ The agents and skills must live in the repo you review (or your user profile). P
   Copy-Item -Recurse "$AiAgents/.github/agents" .\.github\ -Force
   Copy-Item -Recurse "$AiAgents/.github/skills" .\.github\ -Force
   ```
-- **Personal (all your workspaces):** run **`install-to-vscode.bat`** from this repo (double-click it, or
-  run it in a terminal). It auto-detects your VS Code user `prompts` folder — Scoop, stable, or Insiders —
-  then copies the agent files into it and the skills into `prompts\skills\`. To target a specific folder,
-  pass it as an argument: `install-to-vscode.bat "D:\path\to\User\prompts"`. If no VS Code folder is found on
-  the PC, it asks you to type one.
+- **Personal (all your AI tools, every workspace + terminal):** run the installer for your OS from this repo.
+  It installs the agents and skills **globally for every AI tool on the machine** (Claude Code, VS Code
+  Copilot, and the Copilot CLI) and also downloads the latest **caveman** skills:
+  - **Windows:** double-click **`install.bat`** (or run it in a terminal).
+  - **macOS / Linux:** run **`./install.sh`**.
 
-  > **Note — skills need one extra setting to go global (the installer sets it for you).**
-  > Agent files (`*.agent.md`) placed in the user `prompts` folder are picked up in every workspace
-  > automatically. **Skills are not** — VS Code only scans workspace locations (`.github/skills/`,
-  > `.agents/skills/`, `.claude/skills/`) unless an extra location is registered in your **user**
-  > `settings.json` via `chat.agentSkillsLocations`. `install-to-vscode.bat` runs `Add-SkillsLocation.ps1`
-  > to add this entry for you (idempotently, preserving your existing settings):
-  > ```jsonc
-  > "chat.agentSkillsLocations": {
-  >     "~/.../User/prompts/skills": true
-  > }
-  > ```
-  > The value **must be relative or start with `~/`** (VS Code rejects absolute paths and `\`
-  > separators). `~/` resolves to your home folder, so the entry applies to **all** workspaces. If you
-  > ever add it by hand, point the path at wherever the installer put `prompts/skills` (forward slashes).
+  Add **`-NoCaveman`** (Windows) / **`--no-caveman`** (shell) to skip the caveman download.
 
-Reload VS Code (`Developer: Reload Window`) so the new agent shows in the agent picker and the skills load
-in every workspace.
+  > **Why install everywhere?** Each AI tool only scans **its own** home folder, so the installer copies into
+  > all of them:
+  >
+  > | Tool | Skills | Agents |
+  > |------|--------|--------|
+  > | Claude Code | `~/.claude/skills` | `~/.claude/agents` |
+  > | VS Code Copilot | `~/.copilot/skills` (+ `~/.claude/skills`) | `~/.copilot/agents` |
+  > | Copilot CLI | `~/.copilot/skills` | `~/.copilot/agents` |
+  >
+  > **Skills** use one portable `SKILL.md` format, so they are copied as-is to both `~/.copilot/skills` and
+  > `~/.claude/skills`. **Agents** are Copilot-format (`*.agent.md`); the Copilot copy goes to
+  > `~/.copilot/agents` unchanged, and a **Claude-subagent copy** (kebab `name` + `description`, full tools) is
+  > written to `~/.claude/agents` so Claude Code loads it too.
+  >
+  > As a safety net for older VS Code builds, the installer also registers `~/.copilot` in your **user**
+  > `settings.json` (idempotently): `chat.agentSkillsLocations` → `~/.copilot/skills` (accepts `~/`-relative)
+  > and `chat.agentFilesLocations` → the absolute `~/.copilot/agents` path (this key does **not** expand `~`).
+
+After installing:
+- **Claude Code:** restart it (or run `/agents`) — skills and agents load from `~/.claude`.
+- **VS Code:** run `Developer: Reload Window` so the agents appear in the picker and skills load everywhere.
+- **Copilot CLI:** picks up `~/.copilot` automatically in any terminal.
 
 ### Step 2 — Create your access tokens
 You need two Personal Access Tokens (PATs). Treat them like passwords.
