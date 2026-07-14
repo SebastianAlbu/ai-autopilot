@@ -42,3 +42,9 @@ baseline security/reliability rules.
 ```
 Apply the verdict guidance from the rules reference (any Blocker → CHANGES; many Major → CHANGES). If the change
 is clean, return PASS.
+
+## Output Style (minimal tokens)
+Follow the `token-saver` skill. Emit findings only — one line each:
+`[Blocker|Major|Minor|Nit] path:line — problem → fix`. No preamble, no diff restatement, no full-file quotes;
+quote at most the one offending line. End with a single-line section verdict (`PASS | COMMENTS | CHANGES`).
+If nothing to report: `PASS — no findings.`

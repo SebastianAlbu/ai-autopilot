@@ -31,3 +31,9 @@ are **centralized in a constants class**, not hardcoded across the project.
 Summary: <n> violation(s), <n> secret/blocker.
 ```
 If everything is already centralized, return PASS.
+
+## Output Style (minimal tokens)
+Follow the `token-saver` skill. Emit findings only — one line each:
+`[Blocker|Major|Minor|Nit] path:line — problem → fix`. No preamble, no diff restatement, no full-file quotes;
+quote at most the one offending line. End with a single-line section verdict (`PASS | COMMENTS | CHANGES`).
+If nothing to report: `PASS — no findings.`

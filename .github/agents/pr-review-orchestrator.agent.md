@@ -47,24 +47,20 @@ it falls back to a local-git diff.
 5. **Aggregate** every reviewer's findings into one report. De-duplicate overlapping findings, keep the
    highest severity, and group by category.
 6. **Decide a verdict** using the rules below and present the final report in chat.
-7. **Offer to post it to the PR.** After showing the report, ask the user: *"Post this review to the Bitbucket
-   PR as a comment?"* Only proceed if they say yes. (Skip the offer in branch/local mode — there is no PR to
-   post to.)
-8. **Post via the `bitbucket-pr-comment` skill** when the user confirms:
-   - First run a **preview**: `Add-PullRequestComment.ps1 -Url <pr-url> -File <review.md> -DryRun` and show
-     what will be posted.
-   - On confirmation, post the summary for real (drop `-DryRun`).
-   - If the user wants line-level notes, build a findings JSON (`{path,line,lineType,text}` per item) and post
-     with `-InlineFindings`. Report the created comment link(s).
+7. **Post it to the PR directly** via the `bitbucket-pr-comment` skill — no confirmation prompt:
+   - Post the summary comment: `Add-PullRequestComment.ps1 -Url <pr-url> -File <review.md>`.
+   - If there are line-level findings, build a findings JSON (`{path,line,lineType,text}` per item) and post
+     with `-InlineFindings`.
+   - Report the created comment link(s). Skip posting only in branch/local mode (no PR exists) or if posting
+     returns 401/403 (token lacks write permission — say so).
 
 ## Constraints
 - DO NOT rewrite or "fix" the author's code. You review; you do not implement changes.
 - DO NOT approve when any **Blocker** exists, or when functionality/ticket alignment is unmet.
 - DO NOT invent diff content — review only what `bitbucket-pr-context` returns.
 - DO NOT print secrets or tokens. If a reviewer finds a secret, surface it as a Blocker without echoing it.
-- DO NOT post to the PR without explicit user confirmation, and always show a `-DryRun` preview first.
-  Posting needs a write-scoped `BITBUCKET_PAT`; if posting returns 401/403, tell the user the token lacks
-  write permission.
+- POST the review to the PR directly without asking (except branch/local mode). Posting needs a write-scoped
+  `BITBUCKET_PAT`; if posting returns 401/403, tell the user the token lacks write permission.
 - Prefer delegating to the specialist sub-agents over reviewing everything yourself; you own synthesis, the
   verdict, and posting.
 
@@ -102,6 +98,6 @@ Jira: <keys or none>   |   Files changed: <n>   |   Project type: <csharp-visual
 - …
 ```
 
-If the user asks, you may save the report to a file (e.g. `review-<branch>.md`) before posting. When the user
-confirms posting, use the `bitbucket-pr-comment` skill (preview with `-DryRun`, then post) and return the
-created comment link. Otherwise, leave the report in chat.
+Save the report to a file (e.g. `review-<branch>.md`), then post it straight to the PR via the
+`bitbucket-pr-comment` skill and return the created comment link — no confirmation step. In branch/local mode
+(no PR) leave the report in chat.

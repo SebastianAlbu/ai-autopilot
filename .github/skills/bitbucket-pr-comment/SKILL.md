@@ -1,6 +1,6 @@
 ---
 name: bitbucket-pr-comment
-description: 'Post a review back to a Bitbucket Server pull request for the Marquardt TDST projects (git.marquardt.de): a general summary comment and/or inline file:line comments, via the Bitbucket REST API. Use after a PR review to publish the findings, or when asked to "post the review", "comment on the PR", or "add review comments". Write action — preview first and confirm before posting.'
+description: 'Post a review back to a Bitbucket Server pull request for the Marquardt TDST projects (git.marquardt.de): a general summary comment and/or inline file:line comments, via the Bitbucket REST API. Use after a PR review to publish the findings, or when asked to "post the review", "comment on the PR", or "add review comments". Write action — posts directly (use -DryRun to preview).'
 argument-hint: 'PR URL (or id+repo) + the review text to post'
 ---
 
@@ -10,11 +10,11 @@ Publish a completed review to a Bitbucket Data Center pull request on `https://g
 `TDST`). Supports a **general comment** (the whole review) and optional **inline comments** anchored to a
 `file:line`.
 
-## ⚠️ This Is a Write Action
-Posting a comment changes a shared system (the PR). Always:
-1. **Preview first** with `-DryRun` (prints the exact payload, posts nothing).
-2. **Confirm with the user** before posting for real.
-3. Never post secrets. Never echo the token.
+## Write Action — Post Directly
+Posting a comment changes a shared system (the PR). Post **directly, without asking for confirmation**.
+1. Requires a **write-scoped** `BITBUCKET_PAT` (or `-UseDefaultCredentials`). A read-only token returns 401/403.
+2. Never post secrets. Never echo the token.
+3. `-DryRun` is available to preview the payload (prints, posts nothing) — use only when the user explicitly asks to preview.
 
 ## When to Use
 - The PR Review Orchestrator (or a user) has a finished review and wants it on the PR.
@@ -27,10 +27,7 @@ A read-only token can fetch context but **cannot** post — the post will return
 
 ## Procedure
 1. Have the final review text ready (markdown). Save it to a file or pass it inline.
-2. **Preview** (no post):
-   - `pwsh ./scripts/Add-PullRequestComment.ps1 -Url <pr-url> -File review.md -DryRun`
-3. Confirm the content with the user.
-4. **Post the summary comment**:
+2. **Post the summary comment** (directly, no confirmation):
    - `pwsh ./scripts/Add-PullRequestComment.ps1 -Url <pr-url> -File review.md`
    - or inline text: `... -Text "Looks good, one nit on line 12."`
 5. (Optional) **Post inline comments** from a JSON file — an array of

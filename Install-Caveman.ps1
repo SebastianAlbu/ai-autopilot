@@ -12,14 +12,14 @@
 
 [CmdletBinding()]
 param(
-    [string]$DstPath = (Join-Path $HOME '.copilot/skills')
+    [string[]]$DstPath = @((Join-Path $HOME '.copilot/skills'))
 )
 
 $ErrorActionPreference = 'Stop'
 
-# Ensure destination ends in the 'skills' folder.
-if ((Split-Path -Path $DstPath -Leaf) -ne 'skills') {
-    $DstPath = Join-Path $DstPath 'skills'
+# Ensure every destination ends in a 'skills' folder.
+$DstPath = $DstPath | ForEach-Object {
+    if ((Split-Path -Path $_ -Leaf) -ne 'skills') { Join-Path $_ 'skills' } else { $_ }
 }
 
 # GitHub requires TLS 1.2 for API/download on older PowerShell.
@@ -58,15 +58,17 @@ try {
     if (-not $root) { throw "Extracted archive does not contain the expected top-level folder." }
     Write-Host "Archive root: $($root.Name)"
 
-    # Copy skills in the destination path.
+    # Copy skills into each destination path.
     $skillsPath = Join-Path $root.FullName 'skills'
     if (-not (Test-Path $skillsPath)) { throw "'skills' folder not found." }
-    $skillsPath = Join-Path $skillsPath '*'
-    New-Item -ItemType Directory -Path $DstPath -Force | Out-Null
-    Write-Host "Copy skills to $DstPath"
-    Copy-Item -Path $skillsPath -Destination $DstPath -Recurse -Force
+    $skillsGlob = Join-Path $skillsPath '*'
+    foreach ($dst in $DstPath) {
+        New-Item -ItemType Directory -Path $dst -Force | Out-Null
+        Write-Host "Copy skills to $dst"
+        Copy-Item -Path $skillsGlob -Destination $dst -Recurse -Force
+    }
 
-    Write-Host "Done. Installed caveman $tag in $DstPath."
+    Write-Host "Done. Installed caveman $tag."
 }
 finally {
     if (Test-Path $tempPath) { Remove-Item -Path $tempPath -Recurse -Force -ErrorAction SilentlyContinue }
