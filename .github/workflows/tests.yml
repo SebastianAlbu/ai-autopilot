@@ -1,0 +1,59 @@
+# Runs on GitHub Actions. If this repo lives on Bitbucket, the same commands are the local gate —
+# see AGENTS.md.
+
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pester:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pester and PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force -SkipPublisherCheck
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+
+      - name: Pester
+        shell: pwsh
+        run: |
+          $config = New-PesterConfiguration
+          $config.Run.Path = './tests'
+          $config.Output.Verbosity = 'Detailed'
+          $config.Run.Exit = $true
+          Invoke-Pester -Configuration $config
+
+      - name: PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          # plugins/ is a generated copy of .github/skills — scanning it would double every finding.
+          $results = @('.github/skills', 'tests') + @(Get-ChildItem -Filter *.ps1 | ForEach-Object FullName) |
+            ForEach-Object {
+              Invoke-ScriptAnalyzer -Path $_ -Recurse -Severity Error,Warning `
+                -ExcludeRule PSAvoidUsingWriteHost,PSUseShouldProcessForStateChangingFunctions
+            }
+          if ($results) {
+            $results | Format-Table -AutoSize | Out-String | Write-Host
+            $errors = @($results | Where-Object Severity -eq 'Error')
+            if ($errors) { throw "$($errors.Count) PSScriptAnalyzer error(s)." }
+          }
+          Write-Host 'PSScriptAnalyzer: no errors.'
+
+      - name: Plugin tree is up to date
+        shell: pwsh
+        run: |
+          ./Build-Plugin.ps1 | Out-Null
+          $dirty = git status --porcelain plugins .claude-plugin .github/plugin
+          if ($dirty) {
+            Write-Host $dirty
+            throw 'plugins/ is stale — run ./Build-Plugin.ps1 and commit the result.'
+          }
+          Write-Host 'Plugin tree matches .github/.'
