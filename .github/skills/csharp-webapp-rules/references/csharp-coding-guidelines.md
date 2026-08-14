@@ -14,7 +14,7 @@ findings (e.g. `CS-NAME-05`). Severities: **Major**, **Minor**, **Nit** (style).
 | CS-NAME-04 | **Local variables** → camelCase, meaningful, no abbreviations | `firstName`, `salary` | `fName`, `sal`, `_firstName` |
 | CS-NAME-05 | **Member (private field)** → `_` prefix + camelCase | `private IEmployee _employeeService` | `empService`, `userRole` |
 | CS-NAME-06 | **Boolean** → prefix `is`/`has`/`can` | `_isAccepted`, `_isFinished` | `accepted`, `finished` |
-| CS-NAME-07 | **Namespace** → `Company.Product.Module` | `Marquardt.Feedback.BusinessLayer` | `BusinessLayer` |
+| CS-NAME-07 | **Namespace** → `Company.Product.Module` | `Company.Product.BusinessLayer` | `BusinessLayer` |
 | CS-NAME-08 | **File name** = class name (`.cs`) | `HelloWorld.cs` | `helloworld.cs` |
 
 > Note: the c-sharpcorner doc calls local-variable naming "Hungarian", but its own *correct* examples use plain

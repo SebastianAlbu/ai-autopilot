@@ -11,7 +11,7 @@
     How the diff is obtained:
       * REST mode (A and B, when a token/credential is available): the script fetches metadata,
         the changed-file list AND the unified diff directly from the Bitbucket Data Center REST API
-        at https://git.marquardt.de. No local checkout is required — paste a link and go.
+        on a Bitbucket Server / Data Center instance. No local checkout is required — paste a link and go.
       * Local git fallback: if REST is unavailable (no token / offline / older server), the script
         diffs the branches from a local checkout (-RepoPath) using the merge-base.
 
@@ -22,11 +22,11 @@
 
 .PARAMETER Url
     A Bitbucket pull request URL, e.g.
-    https://git.marquardt.de/projects/TDST/repos/my-repo/pull-requests/42/overview
+    https://bitbucket.example.com/projects/PROJ/repos/my-repo/pull-requests/42/overview
     The project key, repo slug, PR id and base URL are all extracted from it.
 
 .PARAMETER SourceBranch
-    Branch that contains the changes (the PR "from" ref). e.g. feature/TDST-123.
+    Branch that contains the changes (the PR "from" ref). e.g. feature/PROJ-123.
 
 .PARAMETER TargetBranch
     Branch the PR merges into (the PR "to" ref). Defaults to 'develop'.
@@ -37,8 +37,14 @@
 .PARAMETER Repo
     Repository slug, required in PR id mode.
 
+.PARAMETER NoPreviousReviews
+    Skip the PR-comment lookup used to detect a follow-up (round 2+) review.
+
+.PARAMETER PreviousReviewLimit
+    How many of the most recent previous review comments to return. Defaults to 2.
+
 .PARAMETER Project
-    Bitbucket project key. Defaults to 'TDST'.
+    Bitbucket project key. Taken from -Url when given; otherwise set it explicitly (or via BITBUCKET_PROJECT).
 
 .PARAMETER RepoPath
     Path to the local git checkout, used only for the local-git fallback. Defaults to the current directory.
@@ -47,13 +53,13 @@
     Force the local-git diff even when REST is available (e.g. to review uncommitted local state).
 
 .EXAMPLE
-    pwsh ./Get-PullRequestContext.ps1 -Url https://git.marquardt.de/projects/TDST/repos/my-repo/pull-requests/42/overview
+    pwsh ./Get-PullRequestContext.ps1 -Url https://bitbucket.example.com/projects/PROJ/repos/my-repo/pull-requests/42/overview
 
 .EXAMPLE
     pwsh ./Get-PullRequestContext.ps1 -PullRequestId 42 -Repo my-repo
 
 .EXAMPLE
-    pwsh ./Get-PullRequestContext.ps1 -SourceBranch feature/TDST-123 -TargetBranch develop -RepoPath C:\repo\my-repo
+    pwsh ./Get-PullRequestContext.ps1 -SourceBranch feature/PROJ-123 -TargetBranch develop -RepoPath C:\repo\my-repo
 #>
 [CmdletBinding(DefaultParameterSetName = 'Branches')]
 param(
@@ -73,11 +79,13 @@ param(
     [Parameter(ParameterSetName = 'Pr', Mandatory = $true)]
     [string]$Repo,
 
-    [string]$Project = 'TDST',
-    [string]$BaseUrl = 'https://git.marquardt.de',
+    [string]$Project = $env:BITBUCKET_PROJECT,
+    [string]$BaseUrl = $(if ($env:BITBUCKET_BASE_URL) { $env:BITBUCKET_BASE_URL } else { 'https://bitbucket.example.com' }),
     [string]$Token = $env:BITBUCKET_PAT,
     [switch]$UseDefaultCredentials,
     [switch]$NoRestDiff,
+    [switch]$NoPreviousReviews,
+    [int]$PreviousReviewLimit = 2,
     [string]$RepoPath = '.',
     [int]$ContextLines = 3
 )
@@ -86,7 +94,8 @@ $ErrorActionPreference = 'Stop'
 
 function Get-JiraKeys {
     param([string]$Text)
-    return @([regex]::Matches("$Text", '[A-Z][A-Z0-9]+-\d+') | ForEach-Object { $_.Value } | Select-Object -Unique)
+    # ,@(...) keeps an empty result an empty JSON array; a bare @() serialises to null.
+    return ,@([regex]::Matches("$Text", '[A-Z][A-Z0-9]+-\d+') | ForEach-Object { $_.Value } | Select-Object -Unique)
 }
 
 function Invoke-Bitbucket {
@@ -132,6 +141,9 @@ if ($PSCmdlet.ParameterSetName -eq 'Url') {
 }
 
 $useRest = $PSCmdlet.ParameterSetName -in @('Url', 'Pr')
+if ($useRest -and [string]::IsNullOrWhiteSpace($Project)) {
+    throw "No Bitbucket project key. Pass -Project <KEY>, set `$env:BITBUCKET_PROJECT, or use -Url (the key is read from the link)."
+}
 $restBase = '{0}/rest/api/1.0/projects/{1}/repos/{2}/pull-requests/{3}' -f $BaseUrl.TrimEnd('/'), $Project, $Repo, $PullRequestId
 
 $meta = $null
@@ -155,6 +167,7 @@ if ($useRest) {
             reviewers    = $reviewers
             sourceBranch = $SourceBranch
             targetBranch = $TargetBranch
+            headCommit   = $pr.fromRef.latestCommit
             state        = $pr.state
             jiraKeys     = Get-JiraKeys ("{0} {1} {2}" -f $pr.title, $pr.description, $SourceBranch)
             link         = '{0}/projects/{1}/repos/{2}/pull-requests/{3}/overview' -f $BaseUrl.TrimEnd('/'), $Project, $Repo, $PullRequestId
@@ -213,11 +226,14 @@ if (-not $restDiffOk) {
             $meta = [pscustomobject]@{
                 id           = $PullRequestId
                 title        = (git log -1 --pretty=%s $src)
-                description  = (git log -1 --pretty=%b $src)
+                # -join: git returns the body as string[], which would serialise as a
+                # JSON array instead of the description string every reviewer expects.
+                description  = ((git log -1 --pretty=%b $src) -join "`n")
                 author       = (git log -1 --pretty=%an $src)
                 reviewers    = @()
                 sourceBranch = $SourceBranch
                 targetBranch = $TargetBranch
+                headCommit   = (git rev-parse $src)
                 state        = 'LOCAL'
                 jiraKeys     = Get-JiraKeys $commitText
                 link         = $null
@@ -230,8 +246,47 @@ if (-not $restDiffOk) {
     }
 }
 
+# --- Previous reviews posted by this system (round 2+ detection) -------------------------------------
+# Bitbucket Server exposes PR comments through /activities (action = COMMENTED). We keep only comments
+# that look like one of our review reports, newest last, so a follow-up round can recover its agenda.
+$previousReviews = @()
+if ($useRest -and -not $NoPreviousReviews) {
+    try {
+        $start = 0
+        do {
+            $acts = Invoke-Bitbucket -Uri ("{0}/activities?limit=100&start={1}" -f $restBase, $start)
+            foreach ($a in $acts.values) {
+                if ($a.action -ne 'COMMENTED' -or -not $a.comment) { continue }
+                $text = [string]$a.comment.text
+                if ($text -notmatch '(?m)^\s*<!--\s*ai-autopilot' -and $text -notmatch '(?m)^#\s*PR Review\b') { continue }
+                $previousReviews += [pscustomobject]@{
+                    commentId   = $a.comment.id
+                    author      = $a.comment.author.displayName
+                    createdDate = $a.comment.createdDate
+                    text        = $text
+                }
+            }
+            $start = $acts.nextPageStart
+        } while (-not $acts.isLastPage)
+        # Newest last; keep the most recent few so the agent isn't fed every historical round.
+        $previousReviews = @($previousReviews | Sort-Object createdDate | Select-Object -Last $PreviousReviewLimit)
+    }
+    catch {
+        Write-Warning "Could not read PR comments ($($_.Exception.Message)). Follow-up mode will not have a previous review to work from."
+    }
+}
+
 Write-Output "===== PR METADATA ====="
 $meta | ConvertTo-Json -Depth 6
+Write-Output ""
+Write-Output "===== PREVIOUS REVIEWS ====="
+if ($previousReviews.Count -gt 0) {
+    Write-Output ("Found {0} previous review comment(s) — this is a FOLLOW-UP review (round {1})." -f $previousReviews.Count, ($previousReviews.Count + 1))
+    $previousReviews | ConvertTo-Json -Depth 6
+}
+else {
+    Write-Output "none — this is a FIRST review."
+}
 Write-Output ""
 Write-Output "===== CHANGED FILES ====="
 $changedFiles

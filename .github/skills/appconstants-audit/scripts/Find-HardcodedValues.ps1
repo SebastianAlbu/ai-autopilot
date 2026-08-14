@@ -12,7 +12,7 @@
     One or more files or folders to scan. Accepts pipeline input (e.g. from `git diff --name-only`).
 
 .EXAMPLE
-    pwsh ./Find-HardcodedValues.ps1 -Path .\FeedbackAsp
+    pwsh ./Find-HardcodedValues.ps1 -Path .\src
 
 .EXAMPLE
     git diff --name-only origin/develop... | pwsh ./Find-HardcodedValues.ps1

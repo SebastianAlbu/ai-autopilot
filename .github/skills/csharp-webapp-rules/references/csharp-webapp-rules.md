@@ -1,6 +1,6 @@
 # C# Web Application Review Rules (baseline)
 
-Tuned for ASP.NET Web Forms / .NET Framework projects (the TDST and mq_feedback style). Each rule has an ID,
+Tuned for ASP.NET Web Forms / .NET Framework projects. Each rule has an ID,
 a severity, what to look for, and the fix to suggest. Severities: **Blocker**, **Major**, **Minor**, **Nit**.
 
 ## 1. Security (OWASP-aligned)
@@ -48,7 +48,7 @@ a severity, what to look for, and the fix to suggest. Severities: **Blocker**, *
 - **Fix:** Handle meaningfully or rethrow; log with context. Don't hide failures.
 
 ### ERR-02 Process kill in shared code — Major
-- **Look for:** `Environment.Exit(...)` inside library/business code (present in mq_feedback `Functionality.cs`).
+- **Look for:** `Environment.Exit(...)` inside library/business code.
 - **Fix:** Throw a meaningful exception and let the host decide; reserve `Exit` for the executable entry point.
 
 ### ERR-03 Catch too broad / lost context — Minor

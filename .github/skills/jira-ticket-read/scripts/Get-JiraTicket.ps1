@@ -1,32 +1,31 @@
 <#
 .SYNOPSIS
-    Reads a Jira ticket from Marquardt Jira and prints its key fields as JSON.
+    Reads a Jira ticket from a Jira Server / Data Center instance and prints its key fields as JSON.
 
 .DESCRIPTION
-    Mirrors the mq_feedback app (FeedbackJiraandDBUpdate/Functionality.cs), which calls
-    https://jira.marquardt.de/rest/api/2/issue/{key} with Basic auth. This reader supports a
+    Calls <base-url>/rest/api/2/issue/{key} (REST v2). This reader supports a
     modern Personal Access Token (Bearer) as well, and never hardcodes credentials.
 
     Auth precedence (highest first):
       1. -Token <pat>          -> Authorization: Bearer
       2. $env:JIRA_PAT         -> Authorization: Bearer
-      3. -User + -Password     -> Authorization: Basic (parity with mq_feedback)
+      3. -User + -Password     -> Authorization: Basic
       4. -UseDefaultCredentials-> domain SSO
 
 .PARAMETER TicketKey
-    The Jira issue key, e.g. TDST-123.
+    The Jira issue key, e.g. PROJ-123.
 
 .PARAMETER Url
-    A Jira URL (e.g. https://jira.marquardt.de/browse/TDST-123); the key is extracted automatically.
+    A Jira URL (e.g. https://jira.example.com/browse/PROJ-123); the key is extracted automatically.
 
 .PARAMETER Fields
     Comma-separated Jira fields to request.
 
 .EXAMPLE
-    pwsh ./Get-JiraTicket.ps1 -TicketKey TDST-123
+    pwsh ./Get-JiraTicket.ps1 -TicketKey PROJ-123
 
 .EXAMPLE
-    pwsh ./Get-JiraTicket.ps1 -Url https://jira.marquardt.de/browse/TDST-123 -Token $env:JIRA_PAT
+    pwsh ./Get-JiraTicket.ps1 -Url https://jira.example.com/browse/PROJ-123 -Token $env:JIRA_PAT
 #>
 [CmdletBinding(DefaultParameterSetName = 'Key')]
 param(
@@ -36,7 +35,7 @@ param(
     [Parameter(ParameterSetName = 'Url', Mandatory = $true)]
     [string]$Url,
 
-    [string]$BaseUrl = 'https://jira.marquardt.de',
+    [string]$BaseUrl = $(if ($env:JIRA_BASE_URL) { $env:JIRA_BASE_URL } else { 'https://jira.example.com' }),
     [string]$Token = $env:JIRA_PAT,
     [string]$User,
     [string]$Password,

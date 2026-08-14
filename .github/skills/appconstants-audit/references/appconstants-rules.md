@@ -4,7 +4,7 @@ The goal: a reviewer can look at one place and know every path, endpoint and sec
 application depends on. Scattered literals make environment changes risky and error-prone.
 
 ## Where Constants Live
-Match the existing project structure. In `mq_feedback` these are:
+Match the existing project structure. Typically these are:
 
 | File | Purpose |
 |------|---------|
@@ -18,7 +18,7 @@ A new project should have an equivalent single `AppConstants` (or `Constants`) c
 ## Must Be Centralized (flag if inline elsewhere)
 1. **UNC paths** — `\\mqde01sdss01\ToolLogs\...`
 2. **Windows drive paths** — `C:\repo\...`, `D:\data\...`
-3. **URLs / endpoints** — `https://jira.marquardt.de/`, `https://git.marquardt.de/`, `https://docs.marquardt.de/...`
+3. **URLs / endpoints** — `https://jira.example.com/`, `https://bitbucket.example.com/`, `https://docs.example.com/...`
 4. **Connection strings** — anything with `Data Source=`, `Initial Catalog=`, `Server=`, `Provider=`.
 5. **Server / host names** — `mqde01sdss01`.
 6. **IP addresses** — `10.x.x.x`, `192.168.x.x`, etc.
