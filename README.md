@@ -28,6 +28,7 @@ This repo is the central hub: build and refine the agents here, then copy `.gith
 flowchart TD
     U["You: paste a PR link"] --> O[PR Review Orchestrator]
     O -->|bitbucket-pr-context skill| CTX[diff + changed files + description + jiraKeys]
+    O -->|bitbucket-pr-threads skill| TH["existing reviewer threads (don't re-report)"]
     O -->|project-type-detect skill| PT{"family + per-language routing"}
     O --> F[code-functionality-reviewer]
     O --> D[pr-description-reviewer]
@@ -41,6 +42,8 @@ flowchart TD
     A -->|appconstants-audit skill| SCAN[Find-HardcodedValues.ps1]
     C -->|csharp-webapp-rules skill| RULES[C# guidelines + web-app rules]
     S -->|sple-standards skill| SPL[SPLE platform standards]
+    S -->|polyspace-baseline skill| POLY[(Polyspace Access)]
+    F -->|jenkins-build-analysis skill| CI[(Jenkins)]
     PY -->|python-rules skill| PYR["Python rules (PY-*)"]
     EC -->|embedded-c-rules skill| ECR["Embedded C rules (EC-*)"]
     F & D & J & A & C & S & PY & EC -->|review-coverage-loop skill| G{Coverage >= 90%?}
@@ -50,6 +53,8 @@ flowchart TD
     FU -->|previous findings = the agenda| O
     R --> P[bitbucket-pr-comment skill]
     P -->|posts comment| PR[(Bitbucket PR)]
+    PR -->|reviewer comments| FB[PR Feedback Responder]
+    FB -->|"fix, reply, resolve"| PR
 ```
 
 ### Agents (`.github/agents/`)
@@ -64,12 +69,14 @@ flowchart TD
 | `sple-standards-reviewer` | **SPLE** projects: component/variant structure, KConfig, CMake, tests & quality gates, static analysis. |
 | `python-reviewer` | **Python** files: correctness traps, resources, typing, security, perf, pytest, packaging (`PY-*`). |
 | `embedded-c-reviewer` | **C/C++** files: memory safety, ISRs & `volatile`, allocation/stack, integers, control flow (`EC-*`). |
+| `pr-feedback-responder` | The other direction: works *incoming* reviewer comments — fixes them, replies, resolves only what is fully addressed. The one agent allowed to edit code. |
 
 ### Skills (`.github/skills/`)
 | Skill | Used by | What it does |
 |-------|---------|--------------|
 | `bitbucket-pr-context` | orchestrator | Get the diff + changed files + PR metadata (Bitbucket REST, or local git). |
 | `bitbucket-pr-comment` | orchestrator | Post the review back to the PR (summary + inline comments). |
+| `review-report-format` | orchestrator | The exact shape of the posted report: metadata line, per-area verdicts, `**Severity** file:line — Symbol: …` findings, themed Blockers, Status footer. |
 | `project-type-detect` | orchestrator | Classify the repo family **and** route each changed file to the rule sets that govern it. |
 | `review-coverage-loop` | **every reviewer** | Re-scan with a new lens each pass until estimated finding coverage reaches 90%. |
 | `review-followup` | **every reviewer** | Round 2+: verify the original findings by ID; block new off-topic findings. |
@@ -78,7 +85,10 @@ flowchart TD
 | `csharp-webapp-rules` | csharp-webapp-reviewer | C# Coding Guidelines & Best Practices v1.0 + web-app security/reliability rules. |
 | `sple-standards` | sple-standards-reviewer | SPLE / spl-core platform standards (CMake, KConfig, variants, tests, SCA). |
 | `python-rules` | python-reviewer | Python rule set `PY-*` — correctness, errors, resources, typing, security, perf, tests, packaging. |
-| `embedded-c-rules` | embedded-c-reviewer | Embedded C/C++ rule set `EC-*` — memory, types, allocation, ISRs, hardware, integers, flow, errors. |
+| `embedded-c-rules` | embedded-c-reviewer | Embedded C/C++ rule set `EC-*` — memory, types, allocation, ISRs, hardware, integers, flow, errors, plus the project's own MISRA/Polyspace subset (`EC-MISRA-*`) and naming/formatting/Doxygen (`EC-NAME/FMT/DOC-*`). |
+| `bitbucket-pr-threads` | orchestrator, pr-feedback-responder | Read reviewer comment **threads**, reply to them, resolve the ones that are done. |
+| `jenkins-build-analysis` | code-functionality-reviewer | Read-only CI triage: which stage failed, why, and which tests broke. |
+| `polyspace-baseline` | sple-standards-reviewer | Point Polyspace at the right baseline (usually the target branch) before comparing findings. |
 
 #### General-purpose skills (available while programming)
 These are not part of the PR-review flow — they are general skills bundled in the package and installed
@@ -307,6 +317,23 @@ The agents and skills must live in the repo you review (or your user profile). P
 
   Add **`-NoCaveman`** (Windows) / **`--no-caveman`** (shell) to skip the caveman download.
 
+- **As a Claude Code / Copilot plugin:** this repo also ships a generated plugin tree under `plugins/` and a
+  marketplace manifest, so it can be installed the same way any other plugin marketplace is.
+
+  ```
+  /plugin marketplace add <path-or-git-url-of-this-repo>
+  /plugin install ai-autopilot@ai-autopilot
+  ```
+
+  `plugins/`, `.claude-plugin/marketplace.json` and `.github/plugin/marketplace.json` are **generated** from
+  `.github/skills` and `.github/agents` — never hand-edit them. After changing a skill or an agent, run:
+
+  ```powershell
+  pwsh ./Build-Plugin.ps1            # add -DryRun to preview, -Version to bump
+  ```
+
+  CI fails the build if the plugin tree is stale. See [AGENTS.md](AGENTS.md).
+
   > **One store, no duplicates.** Everything lives in **one physical place** and the other tools are pointed
   > at it:
   >
@@ -472,6 +499,13 @@ pwsh .\.github\skills\bitbucket-pr-comment\scripts\Add-PullRequestComment.ps1 -U
 | `BITBUCKET_PROJECT` | Default Bitbucket project key | Only needed for id+repo mode; a pasted PR URL supplies it. |
 | `BITBUCKET_PAT` | Fetch PR diff/metadata **and post comments** | Bitbucket → Profile → *Personal access tokens* (Repository: **Write**) |
 | `JIRA_PAT` | Read Jira tickets | Jira → Profile → *Personal Access Tokens* |
+| `JENKINS_BASE_URL` | Jenkins base URL | Defaults to `https://jenkins.example.com`; or pass `-BaseUrl`. |
+| `JENKINS_ROOT_JOB` | Folder every job path is relative to | Optional. With `JENKINS_ROOT_JOB=SPLE`, `-Target MyComp/main` means `/job/SPLE/job/MyComp/job/main`. |
+| `JENKINS_USER` + `JENKINS_TOKEN` | Jenkins Basic auth | Jenkins → *Configure* → *API Token*. The **token replaces the password**, not the user's password. |
+| `JENKINS_AUTH` | Same, as one string | `user:token`. Alternative to the pair above. |
+| `JENKINS_VERIFY_SSL` | TLS verification | `false` only for a self-signed internal CI. Default on. |
+| `POLYSPACE_ACCESS_URL` | Polyspace Access server | Used to resolve the baseline project path; the skill also reads the existing `polyspace.baseline.project` setting to learn your site's prefix. |
+| `POLYSPACE_CHECKERS_XML` | The project's Polyspace checkers selection | Optional — `Get-PolyspaceCheckers.ps1` finds `variants/<variant>/<NAME>.xml` on its own. Set it when the repo has several. |
 
 The scripts also accept `-User/-Password` (Basic auth) and `-UseDefaultCredentials` (domain SSO) instead of a
 token. Never commit tokens.
@@ -501,6 +535,16 @@ token. Never commit tokens.
 | Wrong ruleset applied | Project misclassified — check `project-type-detect`, or invoke a reviewer (`csharp-webapp-reviewer`, `sple-standards-reviewer`, `python-reviewer`, `embedded-c-reviewer`) directly. |
 | One language in the PR wasn't reviewed | Check the `routing` array from `project-type-detect` — it should list one entry per language in the diff. If it's missing, the changed-file list probably wasn't passed (`-ChangedFilesFile`). |
 | `pwsh` not found | Install PowerShell 7+ and reopen the terminal. |
+| Resolving a comment returns `404` | The id is a **reply**, not the thread root. Resolve the first comment of the thread — `Get-PullRequestComments.ps1` prints it unindented. |
+| Resolving returns `409` | Someone edited the comment between the read and the write. The script refetches the version and retries once; run it again if it still conflicts. |
+| A thread appears twice in the listing | Shouldn't happen — the activities feed emits an entry per comment including replies, and the script keeps roots only. Report it with the PR id. |
+| Jenkins says `stage data not available` | Freestyle job — it has no pipeline stages. Use `-Console` to read the plain log. |
+| Jenkins `-Tests` says no test report | The build failed before the tests ran. Read the failed stage log instead. |
+| Jenkins `401` | `JENKINS_USER`/`JENKINS_TOKEN` unset or wrong — the API **token** goes in the password slot, not your password. |
+| Jenkins job not found | A pasted UI URL may contain `/view/<name>` segments; the script strips them, but check the job path is right relative to `JENKINS_ROOT_JOB`. |
+| `No Polyspace checkers XML found` | The repo has no `<polyspace_checkers_selection>` file — the reviewer skips the `EC-MISRA` group rather than inventing a subset. Pass `-Path`/`POLYSPACE_CHECKERS_XML` if it lives outside `variants/`. |
+| Reviewer reports MISRA rules you switched off | It shouldn't — it reads your checkers XML. Check the right variant's XML was found (`Get-PolyspaceCheckers.ps1` prints the file it used). |
+| Review is drowning in naming nits | By design it reports a repeated nit once as a pattern. If it doesn't, the module's own convention wasn't established — say which prefix/style the module uses in the prompt. |
 
 ## Defaults & Conventions
 - **Bitbucket:** REST API v1.0, base URL from `BITBUCKET_BASE_URL`.
