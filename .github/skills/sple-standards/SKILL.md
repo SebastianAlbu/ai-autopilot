@@ -1,23 +1,18 @@
 ---
 name: sple-standards
-description: 'Review rules for Marquardt SPLE (Software Product Line Engineering) platform projects from git.marquardt.de/projects/SPLE — the VS Code-based embedded SPL built on avengineers/spl-core (CMake + KConfig + variants, C/C++ with GoogleTest, Python with ruff/pytest, PowerShell). Use when reviewing a pull request in an SPLE/spl-core project (NOT a Visual Studio C# app): variant/component structure, CMake patterns, KConfig features, unit tests and quality gates, static code analysis (cppcheck), and Python/PowerShell tooling conventions.'
+description: 'The rule set for reviewing SPLE (Software Product Line Engineering) platform projects built on avengineers/spl-core — CMake + KConfig + variants, components in C/C++ with GoogleTest, Python with ruff/pytest, PowerShell build scripts. Covers component and variant structure, KConfig feature modelling, CMake patterns, embedded C/C++ safety, unit tests and quality gates, and cppcheck static analysis. Use whenever a diff touches CMakeLists.txt, KConfig, variants/, components/, build.ps1 or pypeline.yaml, or on requests like "review this embedded change", "check my component", "does this break the other variants". For Visual Studio C# web apps, use csharp-webapp-rules instead.'
 argument-hint: 'changed files in an SPLE/spl-core project'
 ---
 
 # SPLE Platform Review Rules
 
-Standards for **SPLE platform** projects (Marquardt `git.marquardt.de/projects/SPLE`, based on the
+Standards for **SPLE platform** projects (based on the
 open-source [avengineers/spl-core](https://github.com/avengineers/spl-core) and the
 [SPLed](https://github.com/avengineers/SPLed) demonstrator). These are **embedded software product lines** —
 C/C++ firmware organized into reusable components and configured into product **variants** via **KConkig**,
 built with **CMake** through `spl-core`, tested with **GoogleTest** (C/C++) and **pytest** (Python), and
 developed in **VS Code**. This is a different world from the Visual Studio C# web apps — use this skill, not
 `csharp-webapp-rules`, when the project is an SPLE project.
-
-## When to Use
-- The project under review is an **SPLE / spl-core** project (see detection markers below or use the
-  `project-type-detect` skill).
-- You're reviewing changes to components (C/C++), variants/KConfig, CMake, tests, or the Python/PowerShell tooling.
 
 ## How to Apply
 1. Read the full rule set: [sple-standards.md](./references/sple-standards.md).

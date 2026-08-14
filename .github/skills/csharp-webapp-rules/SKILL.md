@@ -1,6 +1,6 @@
 ---
 name: csharp-webapp-rules
-description: 'Review rules for C# web applications (ASP.NET Web Forms / .NET Framework) as used in the Marquardt TDST and mq_feedback projects. Covers the C# Coding Guidelines & Best Practices v1.0 (naming conventions, control prefixes, indentation/comments, good programming practices, N-tier architecture) PLUS security (OWASP Top 10, SQL injection, XSS, secrets), error handling, resource disposal/using, async correctness, configuration, input validation, logging and naming. Use when reviewing C# / ASP.NET (Visual Studio) code in a pull request.'
+description: 'The rule set for reviewing C# / ASP.NET (Web Forms, .NET Framework) web applications: the C# Coding Guidelines & Best Practices v1.0 (naming, control prefixes, formatting, good practices, N-tier architecture) plus a security and reliability baseline — SQL injection, XSS, secrets, weak crypto, CSRF, swallowed exceptions, undisposed IDisposable, async-void and sync-over-async, unchecked null returns. Use whenever a diff touches .cs/.aspx files or a .sln/.csproj project, including plain requests like "review this C# change", "is this code safe", "check my ASP.NET page", or a PR review where the project turns out to be a Visual Studio web app. For embedded SPLE / spl-core projects (CMake, KConfig, C/C++), use sple-standards instead.'
 argument-hint: 'changed C# files to review'
 ---
 
@@ -14,11 +14,6 @@ Review rules for C#/ASP.NET (Visual Studio) changes. Two reference sets, applied
 
 These are tuned to what the codebase uses (ASP.NET Web Forms, LINQ-to-SQL / ADO.NET, RestSharp, file IO,
 custom crypto). Apply to the changed lines; don't demand churn of untouched legacy code.
-
-## When to Use
-- Reviewing a **C# / ASP.NET (Visual Studio)** diff in a pull request (`.sln`/`.csproj`/`*.cs`/`*.aspx`).
-- Checking naming/style/architecture **and** security, resource leaks, error-handling and async problems.
-- (For embedded **SPLE / VS Code** projects — CMake/C/C++/Python — use the `sple-standards` skill instead.)
 
 ## How to Apply
 1. Read both rule sets:

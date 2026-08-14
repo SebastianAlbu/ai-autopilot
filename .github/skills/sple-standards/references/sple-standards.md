@@ -1,6 +1,6 @@
 # SPLE Platform Standards (spl-core)
 
-Detailed rules for reviewing **SPLE / spl-core** projects (Marquardt `projects/SPLE`, upstream
+Detailed rules for reviewing **SPLE / spl-core** projects (upstream
 [avengineers/spl-core](https://github.com/avengineers/spl-core) + [SPLed](https://github.com/avengineers/SPLed)).
 Cite the rule ID (e.g. `SPL-CMAKE-02`). Severities: **Blocker**, **Major**, **Minor**, **Nit**.
 

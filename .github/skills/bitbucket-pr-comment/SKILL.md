@@ -1,13 +1,13 @@
 ---
 name: bitbucket-pr-comment
-description: 'Post a review back to a Bitbucket Server pull request for the Marquardt TDST projects (git.marquardt.de): a general summary comment and/or inline file:line comments, via the Bitbucket REST API. Use after a PR review to publish the findings, or when asked to "post the review", "comment on the PR", or "add review comments". Write action — posts directly (use -DryRun to preview).'
+description: 'Publish a finished review to a Bitbucket Server pull request: a general summary comment, optional inline comments anchored to file:line, and the round marker the next review round needs to find its agenda. Use whenever a review is complete and should land on the PR — "post the review", "comment on the PR", "add review comments", "send this to Bitbucket", "leave inline notes on the findings" — or right after producing a review report, since a review that stays in chat never reaches the author. Write action: it posts directly, so preview with -DryRun when you only want to see the payload.'
 argument-hint: 'PR URL (or id+repo) + the review text to post'
 ---
 
 # Bitbucket Pull Request Comment
 
-Publish a completed review to a Bitbucket Data Center pull request on `https://git.marquardt.de` (project key
-`TDST`). Supports a **general comment** (the whole review) and optional **inline comments** anchored to a
+Publish a completed review to a Bitbucket Server / Data Center pull request (base URL from
+`$env:BITBUCKET_BASE_URL`). Supports a **general comment** (the whole review) and optional **inline comments** anchored to a
 `file:line`.
 
 ## Write Action — Post Directly
@@ -15,10 +15,6 @@ Posting a comment changes a shared system (the PR). Post **directly, without ask
 1. Requires a **write-scoped** `BITBUCKET_PAT` (or `-UseDefaultCredentials`). A read-only token returns 401/403.
 2. Never post secrets. Never echo the token.
 3. `-DryRun` is available to preview the payload (prints, posts nothing) — use only when the user explicitly asks to preview.
-
-## When to Use
-- The PR Review Orchestrator (or a user) has a finished review and wants it on the PR.
-- You need to add inline comments for specific findings.
 
 ## Authentication (never hardcode secrets)
 Same token as the read side: a Bitbucket **Personal Access Token** with *Repository write* (or *PR write*)
@@ -35,13 +31,31 @@ A read-only token can fetch context but **cannot** post — the post will return
    - `pwsh ./scripts/Add-PullRequestComment.ps1 -Url <pr-url> -InlineFindings findings.json`
 6. The script prints the created comment id and a clickable link.
 
+## Round Marker (required)
+Every posted review report **must start with a machine-readable marker line** so the next review round can
+find it and recover its agenda:
+
+```
+<!-- ai-autopilot: round=1 head=a1b2c3d ids=F1-F7 -->
+# PR Review — <title> (<source> → <target>)
+...
+```
+
+- `round` — this review round, starting at 1.
+- `head` — the PR head commit this round reviewed (`headCommit` from `bitbucket-pr-context`).
+- `ids` — the finding-ID range issued so far, so the next round continues the numbering without reuse.
+
+`Get-PullRequestContext.ps1` looks for exactly this marker (or a `# PR Review` heading) when it builds the
+`===== PREVIOUS REVIEWS =====` section. **Drop the marker and follow-up mode silently degrades into a fresh
+full review** — which is the topic-drift failure the `review-followup` skill exists to prevent.
+
 ## Inline Comment JSON Shape
 ```json
 [
-  { "path": "FeedbackAsp/Functionality/Source/Functionality.cs", "line": 36, "lineType": "ADDED",
-    "text": "[Major] UNC path hardcoded — move to AppConstants.WWW_DIR." },
-  { "path": "FeedbackCreateTickets/Functionality.cs", "line": 120, "lineType": "ADDED",
-    "text": "[Major] Environment.Exit in shared code — throw instead." }
+  { "path": "src/Services/OrderService.cs", "line": 36, "lineType": "ADDED",
+    "text": "[F2][Major] UNC path hardcoded — move to AppConstants.WWW_DIR." },
+  { "path": "src/Jobs/TicketSyncJob.cs", "line": 120, "lineType": "ADDED",
+    "text": "[F4][Major] Environment.Exit in shared code — throw instead." }
 ]
 ```
 - `lineType`: `ADDED` (new line, default), `REMOVED` (deleted line), or `CONTEXT` (unchanged).

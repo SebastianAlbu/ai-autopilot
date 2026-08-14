@@ -1,19 +1,15 @@
 ---
 name: appconstants-audit
-description: 'Check that hardcoded paths, URLs, server/UNC paths, connection strings and other configuration literals live in a centralized constants class (AppConstants.cs / Header.cs / Constants.cs / *Settings*.cs) instead of being scattered across the project. Use when reviewing C# changes for configuration centralization, magic strings, or hardcoded values that should be constants.'
+description: 'Find configuration literals that were hardcoded inline instead of centralized in a constants class — server/UNC paths, URLs and endpoints, connection strings, hosts, IPs, emails, ports, and any credential in source (always a blocker). Use when reviewing C# changes for configuration centralization, and also on softer phrasings that mean the same thing: "magic strings", "hardcoded values", "these paths should be constants", "is anything environment-specific in here", "any secrets committed", or a general C# review where paths and URLs appear in the diff. The regex scanner alone misses composed and interpolated strings, so this skill pairs it with the manual passes that catch them.'
 argument-hint: 'path or changed files to scan'
 ---
 
 # AppConstants Audit
 
 Enforce the project convention: **all environment-specific or reused literals belong in a single constants
-class**, not inline across the code base. In `mq_feedback` the constants live in
-`FeedbackAsp/Functionality/Header/AppConstants.cs`, `Header.cs`, and `Constants.cs` — yet UNC paths and URLs
-are still hardcoded inside `Functionality.cs`. That is exactly the smell this audit catches.
-
-## When to Use
-- Reviewing a C# diff for hardcoded paths, URLs, connection strings, IPs, or emails.
-- Verifying new literals were added to a constants class rather than inline.
+class**, not inline across the code base. Typically the constants live in a file such as `AppConstants.cs`,
+`Header.cs`, `Constants.cs` or `*Settings*.cs` — yet server/UNC paths, URLs and connection strings keep
+getting hardcoded in business and UI code anyway. That is exactly the smell this audit catches.
 
 ## What Must Be Centralized
 See [appconstants-rules.md](./references/appconstants-rules.md) for the full rule set. In short, flag inline:
@@ -25,7 +21,7 @@ See [appconstants-rules.md](./references/appconstants-rules.md) for the full rul
 
 ## Procedure
 1. Scan the changed files (or a folder):
-   - `pwsh ./scripts/Find-HardcodedValues.ps1 -Path .\FeedbackAsp`
+   - `pwsh ./scripts/Find-HardcodedValues.ps1 -Path .\src`
    - or pipe changed files: `git diff --name-only origin/develop... | pwsh ./scripts/Find-HardcodedValues.ps1`
 2. The script reports `file:line` findings and ignores designer/generated files and the constants files
    themselves (a literal *inside* `AppConstants.cs` is fine; the same literal in `Functionality.cs` is not).

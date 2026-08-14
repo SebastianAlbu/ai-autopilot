@@ -1,19 +1,24 @@
 <#
 .SYNOPSIS
-    Register the ~/.copilot agents + skills folders in a VS Code user settings.json.
+    Register the ~/.copilot agents folder in a VS Code user settings.json, and remove
+    any duplicate skills-folder registration.
 
 .DESCRIPTION
-    VS Code (Copilot) and the Copilot CLI both scan "~/.copilot/agents" and
-    "~/.copilot/skills" as GLOBAL locations by default, so copying the files there is
-    normally enough. This script additionally registers those folders in the VS Code
-    user settings.json as a belt-and-suspenders measure (covers older builds that do
-    not scan ~/.copilot yet):
+    Registers the agents folder, and REMOVES any skills-folder registration:
 
-        chat.agentSkillsLocations  -> "~/.copilot/skills"   (accepts "~/"-relative)
-        chat.agentFilesLocations   -> "<abs>/.copilot/agents" (no "~" expansion; abs)
+        chat.agentFilesLocations   -> "<abs>/.copilot/agents"  (added; no "~" expansion)
+        chat.agentSkillsLocations  -> "~/.copilot/skills"      (REMOVED, see below)
+
+    VS Code Copilot reads ~/.claude/skills natively. Registering a second skills folder
+    that holds the same skills is what makes every skill appear twice in the picker, so
+    the installer keeps one real store (~/.claude/skills), junctions ~/.copilot/skills at
+    it for the Copilot CLI, and this script strips the now-duplicate registration.
+
+    Agents still need the explicit registration: they live in a separate folder in the
+    Copilot *.agent.md schema, which is not what ~/.claude/agents contains.
 
     Edits are idempotent and preserve existing JSONC (comments / trailing commas) by
-    doing targeted text inserts rather than a full re-serialize.
+    doing targeted text edits rather than a full re-serialize.
 
 .PARAMETER SettingsPath
     Full path to the VS Code user settings.json.
@@ -85,5 +90,23 @@ function Add-LocationEntry {
     Write-Host "[OK] Added '$Key' -> $Value"
 }
 
-Add-LocationEntry -Key 'chat.agentSkillsLocations' -Value $skillsValue
-Add-LocationEntry -Key 'chat.agentFilesLocations'  -Value $agentsValue
+function Remove-LocationValue {
+    param([string]$Value)
+
+    if (-not (Test-Path -LiteralPath $SettingsPath)) { return }
+    $lines = @(Get-Content -LiteralPath $SettingsPath)
+    $needle = '"' + $Value + '"'
+    $kept = @($lines | Where-Object { $_ -notmatch [regex]::Escape($needle) })
+    if ($kept.Count -eq $lines.Count) { return }
+
+    # Line-scoped delete on purpose: settings.json is JSONC, so a parse + re-serialize
+    # would strip the user's comments. VS Code writes one entry per line.
+    Set-Content -LiteralPath $SettingsPath -Value $kept -Encoding utf8
+    Write-Host "[OK] Removed duplicate skills location '$Value' from settings.json."
+}
+
+# Strip every form the skills folder may have been registered under.
+Remove-LocationValue -Value $skillsValue
+Remove-LocationValue -Value $skills
+
+Add-LocationEntry -Key 'chat.agentFilesLocations' -Value $agentsValue

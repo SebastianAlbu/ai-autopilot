@@ -7,12 +7,12 @@
     1. Query GitHub API for latest release of JuliusBrussee/caveman.
     2. Download the source zip (zipball).
     3. Extract archive to a temp folder.
-    4. Copy contents of the release `skills` folder into the destination path (default: $HOME\.copilot\skills).
+    4. Copy contents of the release `skills` folder into the destination path (default: $HOME\.claude\skills - the single skills store).
 #>
 
 [CmdletBinding()]
 param(
-    [string[]]$DstPath = @((Join-Path $HOME '.copilot/skills'))
+    [string[]]$DstPath = @((Join-Path $HOME '.claude/skills'))
 )
 
 $ErrorActionPreference = 'Stop'

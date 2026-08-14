@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Calls POST /rest/api/1.0/projects/{key}/repos/{slug}/pull-requests/{id}/comments on
-    https://git.marquardt.de. Point at the PR with a URL or with id+repo(+project).
+    a Bitbucket Server / Data Center instance. Point at the PR with a URL or with id+repo(+project).
 
     THIS IS A WRITE ACTION. Use -DryRun to preview the exact payload without posting. The script also
     supports -WhatIf/-Confirm (ShouldProcess). Always preview and confirm before posting for real.
@@ -15,7 +15,7 @@
       - -UseDefaultCredentials  domain SSO (NTLM/Kerberos)
 
 .PARAMETER Url
-    A Bitbucket PR URL, e.g. https://git.marquardt.de/projects/TDST/repos/my-repo/pull-requests/42/overview
+    A Bitbucket PR URL, e.g. https://bitbucket.example.com/projects/PROJ/repos/my-repo/pull-requests/42/overview
 
 .PARAMETER PullRequestId
     Numeric PR id (with -Repo and optional -Project) instead of -Url.
@@ -24,7 +24,7 @@
     Repository slug (id mode).
 
 .PARAMETER Project
-    Bitbucket project key. Defaults to 'TDST'.
+    Bitbucket project key. Taken from -Url when given; otherwise set it explicitly (or via BITBUCKET_PROJECT).
 
 .PARAMETER Text
     The comment body (markdown). Mutually usable with -File (one of them for a summary comment).
@@ -63,14 +63,14 @@ param(
     [string]$Repo,
 
     [Parameter(ParameterSetName = 'Ids')]
-    [string]$Project = 'TDST',
+    [string]$Project = $env:BITBUCKET_PROJECT,
 
     [string]$Text,
     [string]$File,
     [string]$InlineFindings,
     [int]$ReplyTo,
 
-    [string]$BaseUrl = 'https://git.marquardt.de',
+    [string]$BaseUrl = $(if ($env:BITBUCKET_BASE_URL) { $env:BITBUCKET_BASE_URL } else { 'https://bitbucket.example.com' }),
     [string]$Token = $env:BITBUCKET_PAT,
     [switch]$UseDefaultCredentials,
     [switch]$DryRun
@@ -89,6 +89,10 @@ if ($PSCmdlet.ParameterSetName -eq 'Url') {
     $PullRequestId = [int]$m.Groups[3].Value
     $uri           = [Uri]$Url
     $BaseUrl       = '{0}://{1}' -f $uri.Scheme, $uri.Authority
+}
+
+if ([string]::IsNullOrWhiteSpace($Project)) {
+    throw "No Bitbucket project key. Pass -Project <KEY>, set `$env:BITBUCKET_PROJECT, or use -Url (the key is read from the link)."
 }
 
 $endpoint = '{0}/rest/api/1.0/projects/{1}/repos/{2}/pull-requests/{3}/comments' -f `
