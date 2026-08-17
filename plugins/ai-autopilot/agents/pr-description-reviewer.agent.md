@@ -34,11 +34,14 @@ report it.
 
 ## Follow-up Mode (re-review)
 If this PR was already reviewed and has new commits since, load the `review-followup` skill and follow it
-**instead of** running a fresh full review. In short: the previous findings are the agenda — verify each as
-`FIXED | PARTIAL | NOT FIXED | REGRESSED | WITHDRAWN` by its stable ID, run the coverage loop on the
-**incremental diff only**, and report a new finding only if it is in code the new commits touched, is a
-regression caused by a fix, or is a Blocker. Do not open new topics on code you already passed in round 1;
-park those under **Deferred (not blocking this PR)**.
+**instead of** running a fresh full review. In short: the **previous Blockers are the agenda** — verify each
+as `FIXED | PARTIAL | NOT FIXED | REGRESSED | WITHDRAWN` by its stable ID and run the coverage loop on the
+**incremental diff only**. Round-1 Majors/Minors/Nits are **not** re-verified: repeat them verbatim as
+carry-over lines, keep their original severity, and never promote one to Blocker because it is still
+unfixed. Report a new finding only if it is a regression caused by a fix, or a genuine Blocker on a line the
+new commits touched — anything else is non-blocking. Do not open new topics on code you already passed in
+round 1; park those under **Deferred (not blocking this PR)**. Work autonomously: no questions, no
+confirmation step.
 
 ## Output Format
 ```

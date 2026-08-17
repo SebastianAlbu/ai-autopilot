@@ -51,7 +51,8 @@ it falls back to a local-git diff.
    If `routing` is empty, say so: the diff is docs, config or build-only, and no language reviewer applies.
 3. **Decide the review mode** — first review or follow-up (see **Follow-up Mode** below). Check the PR's
    existing comments for a previous review from this system and compare the PR head commit to the one it
-   recorded. Say which mode you are in, in one line, before delegating.
+   recorded. Say which mode you are in, in one line, before delegating. Decide this yourself — never ask the
+   user which mode to run or what to check; a re-review request is a complete instruction.
 4. **Plan** with a short todo list (one item per reviewer) so progress is visible.
 5. **Delegate** to the sub-agents, passing each the diff + changed files + **the changed-line set** (see the
    Scope Gate) + the context it needs, and telling each to report only on lines in that set. Run the
@@ -90,26 +91,41 @@ it falls back to a local-git diff.
 
 ## Follow-up Mode (round 2+)
 When the PR has already been reviewed and new commits have landed, load the **`review-followup`** skill and
-run that flow instead of a fresh full review. You own the parts the sub-agents cannot:
+run that flow instead of a fresh full review. Two rules override everything else in this file:
+**the agenda is the previous round's Blockers only**, and **nothing that was not a Blocker before may block
+now**. You own the parts the sub-agents cannot:
 
+0. **Run it end to end without asking.** "Review again", "re-review", "I fixed it", "check my changes" or a
+   second run on an already-reviewed PR is a complete instruction. Detect the mode, verify, render, post,
+   reply and resolve — in one go. Do not ask which mode to use, do not ask what to verify, do not offer
+   options, and do not stop with a drafted report waiting for permission to publish it.
 1. **Recover the previous findings** — read the prior review comment off the PR (it is in the context) or the
-   saved `review-<branch>.md`. That list, with its stable IDs, is the agenda for this round. If you cannot
-   recover it, say so plainly and run a first review instead of inventing a new agenda.
+   saved `review-<branch>.md`. Split it: the **Blockers** are this round's agenda; Majors/Minors/Nits are
+   carry-over information only. If you cannot recover it, say so plainly and run a first review instead of
+   inventing a new agenda.
    Use `bitbucket-pr-threads` (`Get-PullRequestComments.ps1 -Url <link>`) to get the threads **with their
    comment ids** — you need those ids in step 9 to reply per finding and resolve the fixed ones. Threads
-   already `RESOLVED` by a human need no verdict from you.
+   already `RESOLVED` by a human need no verdict from you. An open **human** thread stays on the agenda
+   whatever its severity — you do not get to downgrade a reviewer's own request.
 2. **Compute the incremental diff** — changes since the previously reviewed commit, not the whole PR again.
-3. **Dispatch each reviewer with its own previous findings attached** and the incremental diff, instructing
-   it to: verify each original finding (`FIXED | PARTIAL | NOT FIXED | REGRESSED | WITHDRAWN`) by ID first,
-   then apply the new-findings filter. Do not dispatch a reviewer whose area had no findings and whose files
-   the new commits did not touch — there is nothing for it to do.
-4. **Own the ID space.** Never renumber, never reuse. New findings continue from the highest ID issued so far.
-5. **Enforce the anti-drift rule.** Drop any new finding a reviewer returns that is not (a) in code the new
-   commits touched, (b) a regression caused by a fix, or (c) a Blocker. Move it to **Deferred (not blocking
-   this PR)** rather than deleting it. A follow-up review that raises unrelated topics makes the PR
-   unmergeable and is a failure of this system, not thoroughness.
-6. **Report the delta, not the world.** Lead with `Resolved: <x> of <y>`. If every original finding is
-   `FIXED`/`WITHDRAWN` and nothing new qualifies, the report is a few lines and the verdict is APPROVE.
+3. **Dispatch only the reviewers that own a previous Blocker**, each with its own Blockers attached and the
+   incremental diff, instructing it to verify each by ID (`FIXED | PARTIAL | NOT FIXED | REGRESSED |
+   WITHDRAWN`) and then apply the new-findings filter. Do not dispatch a reviewer whose area had no Blocker
+   and whose files the new commits did not touch — there is nothing for it to do, and re-running it is how
+   round 2 grows a new list of complaints.
+4. **Carry the non-blockers over untouched.** Round-1 Majors/Minors/Nits are repeated verbatim under
+   **Still open (not blocking)**. Do not re-verify them, do not spend reviewer passes on them, do not
+   re-severity them. Mark one `FIXED` and drop it only when the incremental diff plainly fixed that line.
+5. **Own the ID space.** Never renumber, never reuse. New findings continue from the highest ID issued so far.
+6. **Enforce the anti-drift and anti-escalation rules.** Drop any new finding a reviewer returns that is not
+   (a) a regression caused by a fix or (b) a genuine Blocker on a line the new commits touched — move it to
+   **Nice-to-have** (if the new commits introduced it) or **Deferred (not blocking this PR)** rather than
+   deleting it. And never promote a previous Major/Minor to Blocker because it is still unfixed: severity is
+   frozen at the round in which it was first reported. A follow-up review that raises unrelated topics or
+   re-blocks on old non-blockers makes the PR unmergeable and is a failure of this system, not thoroughness.
+7. **Report the delta, not the world.** Lead with `Blockers resolved: <x> of <y>`. If every previous Blocker
+   is `FIXED`/`WITHDRAWN` and nothing new qualifies, the report is a few lines and the verdict is APPROVE (or
+   APPROVE WITH COMMENTS if non-blocking items are still open).
 
 Coverage in this mode is measured on the **incremental diff only** — see the coverage gate below.
 
@@ -148,16 +164,24 @@ A review is not finished until it is **estimated 90% complete**. Every reviewer 
    60% complete.
 5. Report the number in the header. If any area finished below 90% after 5 passes, say so explicitly and
    name the area — do not let a partial review read as complete.
-6. **In follow-up mode** the loop runs on the incremental diff only, the baseline finding set carries over
-   (never restart from zero), and the figure is reported as `Coverage: <n>% (delta since <short-sha>)` so it
-   cannot be mistaken for a full-PR number. One or two passes is normally enough for a small fix commit.
+6. **In follow-up mode** the loop runs on the incremental diff only and covers only the Blocker agenda plus
+   the regression check — carried-over non-blockers are not in the denominator. The baseline finding set
+   carries over (never restart from zero), and the figure is reported as `Coverage: <n>% (delta since
+   <short-sha>)` so it cannot be mistaken for a full-PR number. One or two passes is normally enough for a
+   small fix commit, and `Blockers resolved: <x> of <y>` matters more than the percentage.
 
 ## Constraints
 - DO NOT rewrite or "fix" the author's code. You review; you do not implement changes.
 - DO NOT declare the review complete while any area is below 90% coverage and has passes left.
 - DO NOT fabricate a coverage figure. It comes from the reviewers' actual pass counts, or it is `unmeasured`.
 - DO NOT raise new topics in a follow-up review on code that round 1 already saw and passed. Verify the
-  original findings; park anything else under Deferred. Moving the goalposts each round is a defect.
+  previous Blockers; park anything else under Deferred. Moving the goalposts each round is a defect.
+- DO NOT block a follow-up round on anything that was not a Blocker in the round that first reported it.
+  Severity is frozen; an unfixed Major stays a Major and stays out of the verdict.
+- DO NOT re-verify, re-dispatch reviewers for, or re-argue round-1 non-blockers in a follow-up. Carry them
+  over as one line each under "Still open (not blocking)".
+- DO NOT ask the user anything in follow-up mode — not the mode, not the scope, not whether to post. Detect,
+  verify, post, reply, resolve, then report the link.
 - DO NOT renumber or reuse finding IDs across rounds.
 - DO NOT publish a finding anchored to a line the change did not touch. Re-anchor it to the changed line
   that causes it, or move it to Deferred.
@@ -179,11 +203,13 @@ A review is not finished until it is **estimated 90% complete**. Every reviewer 
 - Only **Minor/Nit** → **APPROVE WITH COMMENTS**.
 - Nothing of substance → **APPROVE**.
 
-In **follow-up mode**, judge the round on the original findings:
-- Any original **Blocker** still `NOT FIXED`/`PARTIAL`, or any `REGRESSED` finding → **CHANGES REQUESTED**.
-- All originals `FIXED`/`WITHDRAWN`, only Minor/Nit left → **APPROVE WITH COMMENTS**.
-- All originals `FIXED`/`WITHDRAWN` and nothing new qualifies → **APPROVE**, in a few lines.
-- **Deferred** items never affect the verdict.
+In **follow-up mode**, judge the round on the previous **Blockers** only:
+- Any previous **Blocker** still `NOT FIXED`/`PARTIAL`, any `REGRESSED` finding, or a new Blocker introduced
+  by the new commits → **CHANGES REQUESTED**.
+- All previous Blockers `FIXED`/`WITHDRAWN`, with round-1 Majors/Minors still open → **APPROVE WITH
+  COMMENTS**, noting they are non-blocking and were not re-verified.
+- All previous Blockers `FIXED`/`WITHDRAWN` and nothing new qualifies → **APPROVE**, in a few lines.
+- Carried-over non-blockers, **Nice-to-have** and **Deferred** items never affect the verdict.
 
 ## Output Format
 The **`review-report-format` skill owns the posted comment's shape** — read it before composing, and follow
@@ -235,13 +261,16 @@ internally; stripping that is your rendering job. Blockers are **themed** — gr
 give the consequence, never paste the Blocker-severity lines a second time.
 
 In **follow-up mode** use the shorter shape from the `review-followup` skill — same header and footer, then
-`## Previous findings` (one `**F<n>** VERDICT — evidence` line each; IDs *are* visible here because they are
-the agenda), then `## New findings (new commits only)`, then
-`Resolved: <x> of <y>   |   Coverage: <n>% (delta since <short-sha>)`. Do not restate the round-1 report.
+`## Previous blockers` (one `**F<n>** VERDICT — evidence` line each; IDs *are* visible here because they are
+the agenda), then `## Still open (not blocking)` (round-1 Majors/Minors carried over verbatim), then
+`## New findings (new commits only)`, then
+`Blockers resolved: <x> of <y>   |   Coverage: <n>% (delta since <short-sha>)`. Do not restate the round-1
+report. Keep every previous finding in the hidden `ai-autopilot-findings` index with its **original
+severity** so the next round can still tell a Blocker from a Major.
 
 Always record the finding IDs and the reviewed head commit in the posted comment — that is what the next
 round reads back to build its agenda.
 
 Save the report to a file (e.g. `review-<branch>.md`), then post it straight to the PR via the
-`bitbucket-pr-comment` skill and return the created comment link — no confirmation step. In branch/local mode
-(no PR) leave the report in chat.
+`bitbucket-pr-comment` skill and return the created comment link — no confirmation step, in every round. In
+branch/local mode (no PR) leave the report in chat.

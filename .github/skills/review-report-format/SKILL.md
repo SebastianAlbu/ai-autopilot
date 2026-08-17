@@ -153,9 +153,16 @@ a finding that has no line anchor — it belongs only in the summary.
 ## Follow-up rounds
 
 Round 2+ uses the `review-followup` skill's shorter shape, with this skill's visual conventions: bolded
-severities, the same metadata line with `Round: 2`, `## Previous findings` (one `**F<n>** VERDICT —
-evidence` line each, IDs **are** visible here because they are the agenda), then `## New findings (new
-commits only)`, then the same `---` + Status footer. Do not restate the round-1 report.
+severities, the same metadata line with `Round: 2`, `## Previous blockers` (one `**F<n>** VERDICT —
+evidence` line each, IDs **are** visible here because they are the agenda), then `## Still open (not
+blocking)` for round-1 Majors/Minors carried over verbatim, then `## New findings (new commits only)`, then
+the same `---` + Status footer. Do not restate the round-1 report.
+
+Two shape rules specific to a follow-up:
+- The `## Blockers (must fix before merge)` section lists **only** unfixed previous Blockers, regressions and
+  Blockers the new commits introduced. A carried-over Major never appears there, however long it stays open.
+- The hidden findings index keeps each finding's **original severity**, not a re-judged one, so the next
+  round can still tell the agenda from the carry-over.
 
 ## Checklist before posting
 
